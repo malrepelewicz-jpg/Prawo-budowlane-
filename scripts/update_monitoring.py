@@ -64,7 +64,7 @@ def review_source(url, area):
             raise ValueError("Brak bezpośredniej strony HTML źródła urzędowego")
         parser = Extract()
         parser.feed(body.decode("utf-8", errors="replace"))
-        content = re.sub(r"\\s+", " ", html.unescape(" ".join(parser.parts))).strip()
+        content = re.sub(r"\s+", " ", html.unescape(" ".join(parser.parts))).strip()
         if len(content) < 250:
             raise ValueError("Za mało tekstu do weryfikacji")
         excerpt = content[:1100]
