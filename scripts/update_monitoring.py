@@ -63,12 +63,14 @@ def review_source(url, area):
         final, content_type, body = get(url)
         if not official(final) or "html" not in content_type.lower():
             raise ValueError("Brak bezpośredniej strony HTML źródła urzędowego")
-        parser = Extract()
-        parser.feed(body.decode("utf-8", errors="replace"))
-        content = re.sub(r"\s+", " ", html.unescape(" ".join(parser.parts))).strip()
+        soup = BeautifulSoup(body, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+        section = soup.select_one("main article, article, main, #content") or soup.body or soup
+        content = re.sub(r"\s+", " ", section.get_text(" ", strip=True)).strip()
         if len(content) < 250:
             raise ValueError("Za mało tekstu do weryfikacji")
-        excerpt = content[:1100]
+        excerpt = content[:5500]
         return {"verification": "Odczytano stronę urzędową — wymaga analizy prawnika",
                 "source_excerpt": excerpt,
                 "recommendation": "Sprawdź pełną treść dokumentu, jego status i daty. Oceń wpływ na " + area.lower() + "; ustal, czy potrzebna jest zmiana wzorów umów lub informacja dla klientów.",
@@ -151,6 +153,46 @@ def direct_official_updates(cutoff, by_id):
             print("Official listing error", page, str(exc)[:180])
     return added
 
+def enrich_with_confirmed_official_sources(by_id, cutoff):
+    """Add a verified direct UOKiK publication, and attach it only to matching articles."""
+    records = [
+        {
+            "area": "Prawo deweloperskie",
+            "title": "UOKiK: Poddasze (nie)użytkowe — kara za wprowadzanie w błąd (decyzja nieprawomocna)",
+            "date": "2026-11-02",
+            "url": "https://uokik.gov.pl/public/poddasze-nieuzytkowe-kara-za-wprowadzanie-w-blad",
+            "match": ("groen", "konstancin", "poddasz", "schod", "60 m²"),
+        },
+    ]
+    count = 0
+    for record in records:
+        if record["date"] < cutoff:
+            continue
+        evidence = review_source(record["url"], record["area"])
+        if not evidence.get("primary_source"):
+            print("Could not verify official publication:", record["url"])
+            continue
+        for item in by_id.values():
+            title = item.get("title", "").lower()
+            if item.get("area") == record["area"] and any(term in title for term in record["match"]):
+                item.update(evidence)
+                item["source_document_type"] = "Komunikat urzędowy (nie pełna decyzja)"
+        ident = hashlib.sha256(("official|" + record["url"]).encode()).hexdigest()[:24]
+        if ident not in by_id:
+            by_id[ident] = {
+                "id": ident, "title": record["title"], "area": record["area"],
+                "type": "Komunikat urzędowy", "date": record["date"],
+                "effective": "", "priority": "Nieoceniona",
+                "status": "Do weryfikacji", "source": record["url"],
+                "selection": "Priorytet wysoki", "impact": "",
+                "action": evidence["recommendation"],
+                "discovery": "Bezpośrednie źródło UOKiK",
+                "source_document_type": "Komunikat urzędowy (nie pełna decyzja)",
+                **evidence,
+            }
+            count += 1
+    return count
+
 def main():
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).date().isoformat()
     old = load()
@@ -197,7 +239,8 @@ def main():
         except Exception as exc:
             print("ERROR", area, str(exc))
     official_added = direct_official_updates((datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat(), by_id)
-    if successes == 0 and official_added == 0:
+    confirmed_added = enrich_with_confirmed_official_sources(by_id, (datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat())
+    if successes == 0 and official_added == 0 and confirmed_added == 0:
         raise SystemExit("Nie udało się odczytać źródeł. Zachowano stare dane.")
     ordered = sorted(by_id.values(), key=lambda x: x.get("date", ""), reverse=True)[:2000]
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -206,7 +249,7 @@ def main():
         "notice": "Automatyczna selekcja i próba odczytu źródła. Nie jest opinią prawną; materiały wymagają weryfikacji.",
         "items": ordered
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print("Saved", len(ordered), "entries; feeds:", successes, "/", len(QUERIES), "official direct:", official_added)
+    print("Saved", len(ordered), "entries; feeds:", successes, "/", len(QUERIES), "official direct:", official_added, "confirmed:", confirmed_added)
 
 if __name__ == "__main__":
     main()
