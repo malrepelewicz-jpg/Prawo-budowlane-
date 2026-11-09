@@ -22,7 +22,7 @@ def fetch(q):
  req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 LegalMonitor/1.0"})
  with urllib.request.urlopen(req,timeout=25) as res: return ET.fromstring(res.read(2_000_000))
 def main():
- cutoff=(datetime.now(timezone.utc)-timedelta(days=30)).date().isoformat()\n existing=load(); by_id={x["id"]:x for x in existing if isinstance(x,dict) and x.get("id") and x.get("date","")>=cutoff}
+ cutoff=(datetime.now(timezone.utc)-timedelta(days=7)).date().isoformat()\n existing=load(); by_id={x["id"]:x for x in existing if isinstance(x,dict) and x.get("id")}
  successes=0
  for area,q in QUERIES.items():
   try:
@@ -41,7 +41,7 @@ def main():
   except Exception as exc: print(f"ERROR {area}: {exc}")
  if not successes:
   raise SystemExit("No sources accessible; leaving existing data unchanged")
- ordered=sorted(by_id.values(),key=lambda x:x.get("date",""),reverse=True)[:500]
+ ordered=sorted(by_id.values(),key=lambda x:x.get("date",""),reverse=True)[:2000]
  OUT.parent.mkdir(parents=True,exist_ok=True)
  OUT.write_text(json.dumps({"updated_at":datetime.now(timezone.utc).isoformat(),"notice":"Automatyczny indeks wiadomości. Nie jest analizą prawną ani zweryfikowanym wykazem zmian.","items":ordered},ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
  print(f"Saved {len(ordered)} entries; {successes}/{len(QUERIES)} feeds accessible")
