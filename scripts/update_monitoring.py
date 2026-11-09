@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Public legal-news index. Discovery only; no legal conclusions."""
 import json, os, re, urllib.parse, urllib.request, xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
@@ -22,7 +22,7 @@ def fetch(q):
  req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 LegalMonitor/1.0"})
  with urllib.request.urlopen(req,timeout=25) as res: return ET.fromstring(res.read(2_000_000))
 def main():
- existing=load(); by_id={x["id"]:x for x in existing if isinstance(x,dict) and x.get("id")}
+ cutoff=(datetime.now(timezone.utc)-timedelta(days=30)).date().isoformat()\n existing=load(); by_id={x["id"]:x for x in existing if isinstance(x,dict) and x.get("id") and x.get("date","")>=cutoff}
  successes=0
  for area,q in QUERIES.items():
   try:
@@ -30,10 +30,10 @@ def main():
    for item in root.findall("./channel/item")[:30]:
     title=(item.findtext("title") or "").strip()
     link=(item.findtext("link") or "").strip()
-    if not title or not link.startswith("https://"):continue
+    if not title or not link.startswith("https://"):continue\n    low=title.lower()\n    relevant=any(t in low for t in ("budowlan","budow","deweloper","wspólnot","wspolnot","roboty budowlane","nieruchomo","pozwolen","wykonawc","inwestycj","orzeczen","wyrok","uchwał","uchwal","ustaw","rozporządzen","rozporzadzen","nadzór budowlany","nadzor budowlany"))\n    if not relevant:continue
     rawdate=item.findtext("pubDate") or ""
     try: date=parsedate_to_datetime(rawdate).date().isoformat()
-    except (ValueError,TypeError):date=""
+    except (ValueError,TypeError):date=""\n    if not date or date<cutoff:continue
     import hashlib
     ident=hashlib.sha256((area+"|"+link).encode()).hexdigest()[:24]
     if ident not in by_id:
