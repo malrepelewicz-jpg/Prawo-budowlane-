@@ -12,11 +12,15 @@ SEARCHES={
  "Prawo deweloperskie": ['"ustawa deweloperska" zmiany','"deweloperski fundusz gwarancyjny" przepisy','"ochrona praw nabywcy" deweloper ustawa'],
 }
 TOPIC={
- "Prawo budowlane": ("budowlan","budow","warunki techniczne","pozwolenie na budowę","nadzór budowlany"),
- "Nieruchomości": ("nieruchomo","własnoś","wlasnos","lokal","planowani","zagospodarowani","księgi wieczyst","ksiegi wieczyst","grunt"),
- "Prawo deweloperskie": ("deweloper","nabywc","mieszkaniowy rachunek powierniczy"),
+ "Prawo budowlane": ("prawo budowlane","prawa budowlanego","warunki techniczne budyn","warunków technicznych budyn","pozwolenie na budowę","nadzór budowlany","nadzoru budowlanego"),
+ "Nieruchomości": ("gospodarce nieruchomościami","gospodarka nieruchomościami","ustawy o własności lokali","ustawa o własności lokali","planowanie przestrzenne","planowaniu i zagospodarowaniu przestrzennym","księgi wieczyste","księgach wieczystych"),
+ "Prawo deweloperskie": ("deweloper","dewelopersk","deweloperski fundusz gwarancyjny","mieszkaniowy rachunek powierniczy"),
 }
-LEGAL=("ustaw","rozporządzen","rozporzadzen","projekt","nowelizac","zmian","przepis","wejści","wejsc","uchwal","legislac")
+LEGAL=("ustaw","rozporządzen","rozporzadzen","nowelizac","zmian przepis","projekt ustawy","projekt rozporządzenia","wejście w życie","wchodzi w życie","uchwalono","legislac")
+EXCLUDE=("opis przedmiotu zamówienia","zapraszamy na szkolenie","przetarg","ogłoszenie o zamówieniu","oferta pracy")
+def relevant(title,area):
+ t=title.lower()
+ return area in TOPIC and any(k in t for k in TOPIC[area]) and any(k in t for k in LEGAL) and not any(k in t for k in EXCLUDE)
 
 def get(url):
  req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 (public legal research index)"})
@@ -27,7 +31,7 @@ def main():
  existing={}
  try:
   data=json.loads(OUT.read_text(encoding="utf-8"))
-  existing={x["id"]:x for x in data.get("items",[]) if x.get("area") in SEARCHES and cutoff<=x.get("published","")<=today.isoformat() and any(k in x.get("title","").lower() for k in TOPIC[x["area"]])}
+  existing={x["id"]:x for x in data.get("items",[]) if x.get("area") in SEARCHES and cutoff<=x.get("published","")<=today.isoformat() and relevant(x.get("title",""),x["area"])}
  except (OSError,ValueError,KeyError,TypeError):pass
  ok=0
  for area,queries in SEARCHES.items():
@@ -42,7 +46,7 @@ def main():
      try:published=parsedate_to_datetime(item.findtext("pubDate") or "").date().isoformat()
      except (ValueError,TypeError):continue
      if not cutoff<=published<=today.isoformat():continue
-     if not any(k in title.lower() for k in LEGAL) or not any(k in title.lower() for k in TOPIC[area]):continue
+     if not relevant(title,area):continue
      ident=hashlib.sha256((area+"|"+link).encode()).hexdigest()[:24]
      existing[ident]={"id":ident,"title":title[:300],"area":area,"published":published,
       "discovery_url":link,"stage":"Nieustalony — wymaga sprawdzenia dokumentu",
