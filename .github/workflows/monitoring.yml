@@ -1,7 +1,7 @@
 name: Aktualizuj indeks prawa
 on:
   schedule:
-    - cron: '15 5 * * 1-5'
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 permissions:
   contents: write
