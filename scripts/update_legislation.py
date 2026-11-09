@@ -7,17 +7,17 @@ from pathlib import Path
 
 OUT=Path("data/legislation.json")
 SEARCHES={
- "Prawo budowlane": ['"prawo budowlane" nowelizacja','"warunki techniczne" budynki rozporządzenie','"pozwolenie na budowę" zmiana przepisów'],
- "Nieruchomości": ['"gospodarka nieruchomościami" nowelizacja','"własność lokali" zmiana ustawy','"planowanie przestrzenne" nowe przepisy','"księgi wieczyste" nowelizacja'],
- "Prawo deweloperskie": ['"ustawa deweloperska" zmiany','"deweloperski fundusz gwarancyjny" przepisy','"ochrona praw nabywcy" deweloper ustawa'],
+ "Prawo budowlane": ['"prawo budowlane" (ustawa OR projekt OR nowelizacja OR rozporządzenie)','"warunki techniczne" (projekt OR rozporządzenie OR zmiany)','"nadzór budowlany" (ustawa OR projekt OR zmiany)'],
+ "Nieruchomości": ['"gospodarka nieruchomościami" (ustawa OR projekt OR nowelizacja)','"własność lokali" (ustawa OR projekt OR nowelizacja)','"planowanie przestrzenne" (ustawa OR projekt OR nowelizacja)','"księgi wieczyste" (ustawa OR projekt OR nowelizacja)'],
+ "Prawo deweloperskie": ['deweloper (ustawa OR projekt OR nowelizacja OR rozporządzenie)','"deweloperski fundusz gwarancyjny" (ustawa OR zmiany)','"ochrona praw nabywcy" (ustawa OR nowelizacja)'],
 }
 TOPIC={
- "Prawo budowlane": ("prawo budowlane","prawa budowlanego","warunki techniczne budyn","warunków technicznych budyn","pozwolenie na budowę","nadzór budowlany","nadzoru budowlanego"),
- "Nieruchomości": ("gospodarce nieruchomościami","gospodarka nieruchomościami","ustawy o własności lokali","ustawa o własności lokali","planowanie przestrzenne","planowaniu i zagospodarowaniu przestrzennym","księgi wieczyste","księgach wieczystych"),
+ "Prawo budowlane": ("prawo budowlane","prawa budowlanego","budowlanych","warunki techniczne","warunków technicznych","pozwolenie na budowę","nadzór budowlany","nadzoru budowlanego"),
+ "Nieruchomości": ("nieruchomościami","nieruchomości","własności lokali","własność lokali","planowanie przestrzenne","planowaniu przestrzennym","zagospodarowaniu przestrzennym","księgi wieczyste","księgach wieczystych"),
  "Prawo deweloperskie": ("deweloper","dewelopersk","deweloperski fundusz gwarancyjny","mieszkaniowy rachunek powierniczy"),
 }
-LEGAL=("ustaw","rozporządzen","rozporzadzen","nowelizac","zmian przepis","projekt ustawy","projekt rozporządzenia","wejście w życie","wchodzi w życie","uchwalono","legislac")
-EXCLUDE=("opis przedmiotu zamówienia","zapraszamy na szkolenie","przetarg","ogłoszenie o zamówieniu","oferta pracy")
+LEGAL=("ustaw","rozporządzen","rozporzadzen","nowelizac","zmian","projekt","wejście w życie","wchodzi w życie","uchwalono","legislac","przepisy")
+EXCLUDE=("opis przedmiotu zamówienia","zapraszamy na szkolenie","przetarg","ogłoszenie o zamówieniu","oferta pracy","szkolenie","webinar","konferencja","przetargi")
 def relevant(title,area):
  t=title.lower()
  return area in TOPIC and any(k in t for k in TOPIC[area]) and any(k in t for k in LEGAL) and not any(k in t for k in EXCLUDE)
