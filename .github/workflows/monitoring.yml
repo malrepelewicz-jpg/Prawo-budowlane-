@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Zainstaluj parser stron urzędowych
+        run: python -m pip install beautifulsoup4==4.12.3
       - name: Pobierz indeks nowych materiałów
         run: python scripts/update_monitoring.py
       - name: Wstępna analiza AI materiałów ze źródeł urzędowych
