@@ -18,6 +18,11 @@ jobs:
           python-version: '3.12'
       - name: Pobierz indeks nowych materiałów
         run: python scripts/update_monitoring.py
+      - name: Wstępna analiza AI materiałów ze źródeł urzędowych
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4.1-mini
+        run: python scripts/analyze_monitoring.py
       - name: Zapisz wyniki
         run: |
           git config user.name "github-actions[bot]"
