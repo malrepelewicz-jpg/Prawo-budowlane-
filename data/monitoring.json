@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-09T07:29:21.882942+00:00",
+  "updated_at": "2026-11-09T08:01:34.555865+00:00",
   "notice": "Automatyczna selekcja i próba odczytu źródła. Nie jest opinią prawną; materiały wymagają weryfikacji.",
   "items": [
     {
@@ -254,7 +254,7 @@
       "priority": "Nieoceniona",
       "status": "Do weryfikacji",
       "source": "https://uokik.gov.pl/public/poddasze-nieuzytkowe-kara-za-wprowadzanie-w-blad",
-      "selection": "Priorytet wysoki",
+      "selection": "Do analizy",
       "impact": "",
       "action": "Sprawdź pełną treść dokumentu, jego status i daty. Oceń wpływ na prawo deweloperskie; ustal, czy potrzebna jest zmiana wzorów umów lub informacja dla klientów.",
       "discovery": "Bezpośrednie źródło UOKiK",
