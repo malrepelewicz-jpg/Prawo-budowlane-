@@ -12,6 +12,20 @@ QUERIES={
  "Prawo deweloperskie": 'site:uokik.gov.pl deweloper OR site:gov.pl "ustawa deweloperska"',
  "Wspólnoty mieszkaniowe": 'site:gov.pl "wspólnoty mieszkaniowe" OR site:sn.pl "wspólnota mieszkaniowa"',
 }
+def classify(title):
+ """Conservative headline triage. Not a legal merits assessment."""
+ t=title.lower()
+ exclusions=("dzień przedsiębiorcy","życzenia","konkurs","webinar","szkolenie","zapraszamy","relacja z konferencji","piknik","nagrody","jubileusz")
+ if any(x in t for x in exclusions):
+  return "Pozostałe", "Informacja ogólna — poza głównym przeglądem."
+ critical=("weszła w życie","wchodzi w życie","wejdzie w życie","nowelizacja","zmiana ustawy","zmiany w prawie","rozporządzenie","uchwała siedmiu sędziów","uchwała sn","wyrok sn","wyrok nsa")
+ if any(x in t for x in critical):
+  return "Priorytet wysoki", "Sprawdź akt lub orzeczenie w źródle pierwotnym, datę, zakres zastosowania i skutki dla klientów."
+ analysis=("wyrok","orzeczenie","uchwała","interpretacja","stanowisko","decyzja","uokik","gunb","nadzór budowlany","projekt ustawy","projekt rozporządzenia")
+ if any(x in t for x in analysis):
+  return "Do analizy", "Zweryfikuj stan prawny, status rozstrzygnięcia i praktyczne znaczenie."
+ return "Pozostałe", "Sprawdź, czy materiał zawiera istotną informację prawną."
+
 def load():
  try:
   obj=json.loads(OUT.read_text(encoding="utf-8"))
@@ -22,7 +36,7 @@ def fetch(q):
  req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 LegalMonitor/1.0"})
  with urllib.request.urlopen(req,timeout=25) as res: return ET.fromstring(res.read(2_000_000))
 def main():
- cutoff=(datetime.now(timezone.utc)-timedelta(days=7)).date().isoformat()\n existing=load(); by_id={x["id"]:x for x in existing if isinstance(x,dict) and x.get("id")}
+ cutoff=(datetime.now(timezone.utc)-timedelta(days=7)).date().isoformat()\n existing=load(); by_id={x["id"]:x for x in existing if isinstance(x,dict) and x.get("id")}\n for entry in by_id.values():\n  entry["selection"],entry["selection_reason"]=classify(entry.get("title",""))
  successes=0
  for area,q in QUERIES.items():
   try:
@@ -37,7 +51,7 @@ def main():
     import hashlib
     ident=hashlib.sha256((area+"|"+link).encode()).hexdigest()[:24]
     if ident not in by_id:
-     by_id[ident]={"id":ident,"title":title[:300],"area":area,"type":"Wiadomość do weryfikacji","date":date,"effective":"","priority":"Nieoceniona","status":"Do weryfikacji","source":link,"impact":"","action":"Otwórz źródło pierwotne i zweryfikuj treść, datę oraz znaczenie prawne.","discovery":"Google News RSS (indeks źródeł; link może prowadzić przez agregator)"}
+     by_id[ident]={"id":ident,"title":title[:300],"area":area,"type":"Wiadomość do weryfikacji","date":date,"effective":"","priority":"Nieoceniona","status":"Do weryfikacji","source":link,"impact":"","action":"Otwórz źródło pierwotne i zweryfikuj treść, datę oraz znaczenie prawne.","discovery":"Google News RSS (indeks źródeł; link może prowadzić przez agregator)","selection":selection,"selection_reason":selection_reason}
   except Exception as exc: print(f"ERROR {area}: {exc}")
  if not successes:
   raise SystemExit("No sources accessible; leaving existing data unchanged")
