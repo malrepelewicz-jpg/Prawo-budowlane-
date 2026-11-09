@@ -95,7 +95,8 @@ def load():
 def main():
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).date().isoformat()
     old = load()
-    by_id = {x["id"]: x for x in old if isinstance(x, dict) and x.get("id")}
+    retention_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat()
+    by_id = {x["id"]: x for x in old if isinstance(x, dict) and x.get("id") and retention_cutoff <= x.get("date", "") <= datetime.now(timezone.utc).date().isoformat()}
     for entry in by_id.values():
         entry["selection"] = classify(entry.get("title", ""))
         entry.setdefault("verification", "Archiwalny wpis — niezweryfikowany")
