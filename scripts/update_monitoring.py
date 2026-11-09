@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Weekly public-source legal monitoring; conservative, evidence-first triage."""
 import hashlib
+from bs4 import BeautifulSoup
 import html
 import json
 import re
@@ -14,10 +15,10 @@ from pathlib import Path
 
 OUT = Path("data/monitoring.json")
 QUERIES = {
-    "Prawo budowlane": 'site:gov.pl/web/gunb "prawo budowlane" OR "pozwolenie na budowę"',
-    "Umowy o roboty": 'site:sn.pl "roboty budowlane" OR site:gov.pl "umowa o roboty budowlane"',
-    "Prawo deweloperskie": 'site:uokik.gov.pl deweloper OR site:gov.pl "ustawa deweloperska"',
-    "Wspólnoty mieszkaniowe": 'site:gov.pl "wspólnoty mieszkaniowe" OR site:sn.pl "wspólnota mieszkaniowa"',
+    "Prawo budowlane": '"prawo budowlane" nowelizacja OR "nadzór budowlany" when:30d',
+    "Umowy o roboty": '"umowa o roboty budowlane" OR "wynagrodzenie wykonawcy" when:30d',
+    "Prawo deweloperskie": '"prawo deweloperskie" OR "deweloper" UOKiK when:30d',
+    "Wspólnoty mieszkaniowe": '"wspólnota mieszkaniowa" uchwała OR zarząd when:30d',
 }
 OFFICIAL = ("gov.pl", "sn.pl", "nsa.gov.pl", "orzeczenia.nsa.gov.pl", "isap.sejm.gov.pl", "dziennikustaw.gov.pl", "uokik.gov.pl", "rcl.gov.pl")
 KEYWORDS = ("budowlan", "budow", "deweloper", "wspólnot", "wspolnot", "nieruchomo", "pozwolen", "wykonawc", "inwestycj", "orzeczen", "wyrok", "uchwał", "uchwal", "ustaw", "rozporządzen", "rozporzadzen", "nadzór budowlany")
@@ -92,6 +93,64 @@ def load():
     except (OSError, ValueError):
         return []
 
+
+def direct_official_updates(cutoff, by_id):
+    """Additional direct discovery on official ministry and GUNB news listings."""
+    pages = [
+        ("Prawo budowlane", "https://www.gov.pl/web/gunb"),
+        ("Prawo budowlane", "https://www.gov.pl/web/rozwoj-technologia/budownictwo-architektura-i-geodezja"),
+    ]
+    added = 0
+    for area, page in pages:
+        try:
+            final, content_type, raw = get(page, 2000000)
+            if not official(final) or "html" not in content_type.lower():
+                continue
+            soup = BeautifulSoup(raw, "html.parser")
+            for anchor in soup.find_all("a", href=True):
+                title = anchor.get_text(" ", strip=True)
+                if len(title) < 18 or len(title) > 280 or not any(k in title.lower() for k in KEYWORDS):
+                    continue
+                url = urllib.parse.urljoin(final, anchor["href"])
+                if not official(url) or url == final:
+                    continue
+                # Date must occur in the immediate listing card, not elsewhere on the page.
+                parent = anchor.parent
+                date = None
+                for _ in range(3):
+                    if parent is None:
+                        break
+                    content = parent.get_text(" ", strip=True)[:450]
+                    match = re.search(r"(?<!\\d)(\\d{2})\\.(\\d{2})\\.(20\\d{2})(?!\\d)", content)
+                    if match:
+                        candidate = f"{match.group(3)}-{match.group(2)}-{match.group(1)}"
+                        try:
+                            datetime.fromisoformat(candidate)
+                            date = candidate
+                            break
+                        except ValueError:
+                            pass
+                    parent = parent.parent
+                if not date or date < cutoff:
+                    continue
+                ident = hashlib.sha256((area + "|" + url).encode()).hexdigest()[:24]
+                if ident in by_id:
+                    continue
+                evidence = review_source(url, area)
+                by_id[ident] = {
+                    "id": ident, "title": title, "area": area,
+                    "type": "Komunikat urzędowy do weryfikacji", "date": date,
+                    "effective": "", "priority": "Nieoceniona",
+                    "status": "Do weryfikacji", "source": url,
+                    "selection": classify(title), "impact": "",
+                    "action": evidence["recommendation"],
+                    "discovery": "Bezpośrednia strona urzędowa", **evidence,
+                }
+                added += 1
+        except Exception as exc:
+            print("Official listing error", page, str(exc)[:180])
+    return added
+
 def main():
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).date().isoformat()
     old = load()
@@ -137,8 +196,9 @@ def main():
                 }
         except Exception as exc:
             print("ERROR", area, str(exc))
-    if successes == 0:
-        raise SystemExit("Nie udało się odczytać żadnego źródła. Zachowano stare dane.")
+    official_added = direct_official_updates((datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat(), by_id)
+    if successes == 0 and official_added == 0:
+        raise SystemExit("Nie udało się odczytać źródeł. Zachowano stare dane.")
     ordered = sorted(by_id.values(), key=lambda x: x.get("date", ""), reverse=True)[:2000]
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
@@ -146,7 +206,7 @@ def main():
         "notice": "Automatyczna selekcja i próba odczytu źródła. Nie jest opinią prawną; materiały wymagają weryfikacji.",
         "items": ordered
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print("Saved", len(ordered), "entries; feeds:", successes, "/", len(QUERIES))
+    print("Saved", len(ordered), "entries; feeds:", successes, "/", len(QUERIES), "official direct:", official_added)
 
 if __name__ == "__main__":
     main()
