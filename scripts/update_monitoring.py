@@ -1,62 +1,151 @@
 #!/usr/bin/env python3
-"""Public legal-news index. Discovery only; no legal conclusions."""
-import json, os, re, urllib.parse, urllib.request, xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta
+"""Weekly public-source legal monitoring; conservative, evidence-first triage."""
+import hashlib
+import html
+import json
+import re
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from pathlib import Path
 
-OUT=Path("data/monitoring.json")
-QUERIES={
- "Prawo budowlane": 'site:gov.pl/web/gunb OR site:gov.pl/web/rozwoj-technologia "prawo budowlane"',
- "Umowy o roboty": 'site:sn.pl "roboty budowlane" OR site:gov.pl "umowa o roboty budowlane"',
- "Prawo deweloperskie": 'site:uokik.gov.pl deweloper OR site:gov.pl "ustawa deweloperska"',
- "Wspólnoty mieszkaniowe": 'site:gov.pl "wspólnoty mieszkaniowe" OR site:sn.pl "wspólnota mieszkaniowa"',
+OUT = Path("data/monitoring.json")
+QUERIES = {
+    "Prawo budowlane": 'site:gov.pl/web/gunb "prawo budowlane" OR "pozwolenie na budowę"',
+    "Umowy o roboty": 'site:sn.pl "roboty budowlane" OR site:gov.pl "umowa o roboty budowlane"',
+    "Prawo deweloperskie": 'site:uokik.gov.pl deweloper OR site:gov.pl "ustawa deweloperska"',
+    "Wspólnoty mieszkaniowe": 'site:gov.pl "wspólnoty mieszkaniowe" OR site:sn.pl "wspólnota mieszkaniowa"',
 }
+OFFICIAL = ("gov.pl", "sn.pl", "nsa.gov.pl", "orzeczenia.nsa.gov.pl", "isap.sejm.gov.pl", "dziennikustaw.gov.pl", "uokik.gov.pl", "rcl.gov.pl")
+KEYWORDS = ("budowlan", "budow", "deweloper", "wspólnot", "wspolnot", "nieruchomo", "pozwolen", "wykonawc", "inwestycj", "orzeczen", "wyrok", "uchwał", "uchwal", "ustaw", "rozporządzen", "rozporzadzen", "nadzór budowlany")
+EXCLUDE = ("dzień przedsiębiorcy", "życzenia", "konkurs", "webinar", "szkolenie", "zapraszamy", "relacja z konferencji", "piknik", "nagrody", "jubileusz")
+
+class Extract(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+        self.skip = 0
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "nav", "footer"):
+            self.skip += 1
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "nav", "footer") and self.skip:
+            self.skip -= 1
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+def official(url):
+    try:
+        p = urllib.parse.urlparse(url)
+        host = (p.hostname or "").lower()
+        return p.scheme == "https" and any(host == d or host.endswith("." + d) for d in OFFICIAL)
+    except ValueError:
+        return False
+
+def get(url, limit=700000):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (legal-monitor; public source review)"})
+    with urllib.request.urlopen(req, timeout=12) as res:
+        final = res.geturl()
+        content_type = res.headers.get("Content-Type", "")
+        body = res.read(limit)
+    return final, content_type, body
+
+def review_source(url, area):
+    """Only inspect a directly accessible official HTML page; never treat Google News as primary evidence."""
+    if not official(url):
+        return {"verification": "Brak weryfikacji źródła pierwotnego", "source_excerpt": "", "recommendation": "Odszukaj i sprawdź oryginalny dokument na stronie organu."}
+    try:
+        final, content_type, body = get(url)
+        if not official(final) or "html" not in content_type.lower():
+            raise ValueError("Brak bezpośredniej strony HTML źródła urzędowego")
+        parser = Extract()
+        parser.feed(body.decode("utf-8", errors="replace"))
+        content = re.sub(r"\\s+", " ", html.unescape(" ".join(parser.parts))).strip()
+        if len(content) < 250:
+            raise ValueError("Za mało tekstu do weryfikacji")
+        excerpt = content[:1100]
+        return {"verification": "Odczytano stronę urzędową — wymaga analizy prawnika",
+                "source_excerpt": excerpt,
+                "recommendation": "Sprawdź pełną treść dokumentu, jego status i daty. Oceń wpływ na " + area.lower() + "; ustal, czy potrzebna jest zmiana wzorów umów lub informacja dla klientów.",
+                "primary_source": final}
+    except Exception:
+        return {"verification": "Nie udało się odczytać źródła pierwotnego", "source_excerpt": "", "recommendation": "Otwórz oryginalny dokument i sprawdź jego treść przed wyciągnięciem wniosków."}
+
 def classify(title):
- """Conservative headline triage. Not a legal merits assessment."""
- t=title.lower()
- exclusions=("dzień przedsiębiorcy","życzenia","konkurs","webinar","szkolenie","zapraszamy","relacja z konferencji","piknik","nagrody","jubileusz")
- if any(x in t for x in exclusions):
-  return "Pozostałe", "Informacja ogólna — poza głównym przeglądem."
- critical=("weszła w życie","wchodzi w życie","wejdzie w życie","nowelizacja","zmiana ustawy","zmiany w prawie","rozporządzenie","uchwała siedmiu sędziów","uchwała sn","wyrok sn","wyrok nsa")
- if any(x in t for x in critical):
-  return "Priorytet wysoki", "Sprawdź akt lub orzeczenie w źródle pierwotnym, datę, zakres zastosowania i skutki dla klientów."
- analysis=("wyrok","orzeczenie","uchwała","interpretacja","stanowisko","decyzja","uokik","gunb","nadzór budowlany","projekt ustawy","projekt rozporządzenia")
- if any(x in t for x in analysis):
-  return "Do analizy", "Zweryfikuj stan prawny, status rozstrzygnięcia i praktyczne znaczenie."
- return "Pozostałe", "Sprawdź, czy materiał zawiera istotną informację prawną."
+    t = title.lower()
+    if any(s in t for s in EXCLUDE):
+        return "Pozostałe"
+    if any(s in t for s in ("wchodzi w życie", "weszła w życie", "wejdzie w życie", "nowelizacja", "zmiana ustawy", "wyrok sn", "wyrok nsa", "uchwała siedmiu sędziów")):
+        return "Priorytet wysoki"
+    if any(s in t for s in ("wyrok", "orzeczenie", "uchwała", "interpretacja", "stanowisko", "decyzja", "rozporządzenie", "projekt ustawy", "projekt rozporządzenia")):
+        return "Do analizy"
+    return "Pozostałe"
 
 def load():
- try:
-  obj=json.loads(OUT.read_text(encoding="utf-8"))
-  return obj.get("items",[]) if isinstance(obj.get("items"),list) else []
- except (OSError,ValueError):return []
-def fetch(q):
- url="https://news.google.com/rss/search?"+urllib.parse.urlencode({"q":q,"hl":"pl","gl":"PL","ceid":"PL:pl"})
- req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 LegalMonitor/1.0"})
- with urllib.request.urlopen(req,timeout=25) as res: return ET.fromstring(res.read(2_000_000))
+    try:
+        data = json.loads(OUT.read_text(encoding="utf-8"))
+        return data.get("items", []) if isinstance(data.get("items"), list) else []
+    except (OSError, ValueError):
+        return []
+
 def main():
- cutoff=(datetime.now(timezone.utc)-timedelta(days=7)).date().isoformat()\n existing=load(); by_id={x["id"]:x for x in existing if isinstance(x,dict) and x.get("id")}\n for entry in by_id.values():\n  entry["selection"],entry["selection_reason"]=classify(entry.get("title",""))
- successes=0
- for area,q in QUERIES.items():
-  try:
-   root=fetch(q);successes+=1
-   for item in root.findall("./channel/item")[:30]:
-    title=(item.findtext("title") or "").strip()
-    link=(item.findtext("link") or "").strip()
-    if not title or not link.startswith("https://"):continue\n    low=title.lower()\n    relevant=any(t in low for t in ("budowlan","budow","deweloper","wspólnot","wspolnot","roboty budowlane","nieruchomo","pozwolen","wykonawc","inwestycj","orzeczen","wyrok","uchwał","uchwal","ustaw","rozporządzen","rozporzadzen","nadzór budowlany","nadzor budowlany"))\n    if not relevant:continue
-    rawdate=item.findtext("pubDate") or ""
-    try: date=parsedate_to_datetime(rawdate).date().isoformat()
-    except (ValueError,TypeError):date=""\n    if not date or date<cutoff:continue
-    import hashlib
-    ident=hashlib.sha256((area+"|"+link).encode()).hexdigest()[:24]
-    if ident not in by_id:
-     by_id[ident]={"id":ident,"title":title[:300],"area":area,"type":"Wiadomość do weryfikacji","date":date,"effective":"","priority":"Nieoceniona","status":"Do weryfikacji","source":link,"impact":"","action":"Otwórz źródło pierwotne i zweryfikuj treść, datę oraz znaczenie prawne.","discovery":"Google News RSS (indeks źródeł; link może prowadzić przez agregator)","selection":selection,"selection_reason":selection_reason}
-  except Exception as exc: print(f"ERROR {area}: {exc}")
- if not successes:
-  raise SystemExit("No sources accessible; leaving existing data unchanged")
- ordered=sorted(by_id.values(),key=lambda x:x.get("date",""),reverse=True)[:2000]
- OUT.parent.mkdir(parents=True,exist_ok=True)
- OUT.write_text(json.dumps({"updated_at":datetime.now(timezone.utc).isoformat(),"notice":"Automatyczny indeks wiadomości. Nie jest analizą prawną ani zweryfikowanym wykazem zmian.","items":ordered},ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
- print(f"Saved {len(ordered)} entries; {successes}/{len(QUERIES)} feeds accessible")
-if __name__=="__main__":main()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).date().isoformat()
+    old = load()
+    by_id = {x["id"]: x for x in old if isinstance(x, dict) and x.get("id")}
+    for entry in by_id.values():
+        entry["selection"] = classify(entry.get("title", ""))
+        entry.setdefault("verification", "Archiwalny wpis — niezweryfikowany")
+        entry.setdefault("source_excerpt", "")
+        entry.setdefault("recommendation", "Sprawdź oryginalne źródło i ustal konsekwencje prawne.")
+    successes = 0
+    for area, query in QUERIES.items():
+        url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({"q": query, "hl": "pl", "gl": "PL", "ceid": "PL:pl"})
+        try:
+            _, _, raw = get(url)
+            root = ET.fromstring(raw)
+            successes += 1
+            for item in root.findall("./channel/item")[:30]:
+                title = (item.findtext("title") or "").strip()
+                link = (item.findtext("link") or "").strip()
+                if not title or not link.startswith("https://") or not any(k in title.lower() for k in KEYWORDS):
+                    continue
+                try:
+                    date = parsedate_to_datetime(item.findtext("pubDate") or "").date().isoformat()
+                except (ValueError, TypeError):
+                    continue
+                if date < cutoff:
+                    continue
+                ident = hashlib.sha256((area + "|" + link).encode()).hexdigest()[:24]
+                if ident in by_id:
+                    continue
+                source = item.find("source")
+                source_url = source.get("url", "") if source is not None else ""
+                # The RSS item link is typically an aggregator redirect, not a primary source.
+                evidence = review_source(source_url, area) if official(source_url) else review_source(link, area)
+                by_id[ident] = {
+                    "id": ident, "title": title[:300], "area": area,
+                    "type": "Materiał do weryfikacji", "date": date, "effective": "",
+                    "priority": "Nieoceniona", "status": "Do weryfikacji",
+                    "source": link, "selection": classify(title),
+                    "impact": "", "action": evidence["recommendation"],
+                    "discovery": "Google News RSS", **evidence
+                }
+        except Exception as exc:
+            print("ERROR", area, str(exc))
+    if successes == 0:
+        raise SystemExit("Nie udało się odczytać żadnego źródła. Zachowano stare dane.")
+    ordered = sorted(by_id.values(), key=lambda x: x.get("date", ""), reverse=True)[:2000]
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps({
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "notice": "Automatyczna selekcja i próba odczytu źródła. Nie jest opinią prawną; materiały wymagają weryfikacji.",
+        "items": ordered
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print("Saved", len(ordered), "entries; feeds:", successes, "/", len(QUERIES))
+
+if __name__ == "__main__":
+    main()
