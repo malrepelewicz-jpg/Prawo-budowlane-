@@ -1,5 +1,32 @@
 {
   "updated_at": "2026-11-09T08:58:17.474331+00:00",
-  "notice": "Wyłącznie wstępnie wyselekcjonowane wyniki dotyczące budownictwa, nieruchomości i deweloperów. Status i daty wymagają sprawdzenia w źródle urzędowym.",
-  "items": []
+  "notice": "Dwie potwierdzone zmiany prawne, w tym zbliżający się termin wejścia w życie. Inne wyniki wymagają weryfikacji.",
+  "items": [
+    {
+      "id": "confirmed-ckob-2032",
+      "title": "Przesunięcie terminu obowiązkowego przejścia na cyfrową książkę obiektu budowlanego (c-KOB)",
+      "area": "Prawo budowlane",
+      "published": "2025-12-23",
+      "stage": "Ustawa ogłoszona; zmiana obowiązuje",
+      "effective_date": "2026-01-07",
+      "deadline": "2032-01-01",
+      "official_document_url": "https://eli.gov.pl/eli/DU/2025/1847/ogl",
+      "discovery_url": "https://e-budownictwo.gunb.gov.pl/pytania-i-odpowiedzi/",
+      "verification": "Potwierdzone: Dz.U. 2025 poz. 1847 oraz wyjaśnienia GUNB",
+      "action": "Sprawdź, które papierowe książki można prowadzić do 31.12.2031; odróżnij nowe obiekty."
+    },
+    {
+      "id": "confirmed-developer-prices-2026",
+      "title": "Nowelizacja ustawy deweloperskiej — elektroniczne przekazywanie danych o cenach (art. 19b)",
+      "area": "Prawo deweloperskie",
+      "published": "2026-08-10",
+      "stage": "Ustawa ogłoszona; wejście w życie 11.11.2026",
+      "effective_date": "2026-11-11",
+      "deadline": "2026-11-11",
+      "official_document_url": "https://eli.gov.pl/eli/DU/2026/1077/ogl",
+      "discovery_url": "https://ppiop.rcl.gov.pl/index.php?id_akt_prawny=306629&r=skorowidz%2Faktprawnydetail",
+      "verification": "Potwierdzone: Dz.U. 2026 poz. 1077",
+      "action": "Zweryfikuj obowiązki przekazywania danych cenowych, strukturę danych i procedury."
+    }
+  ]
 }
