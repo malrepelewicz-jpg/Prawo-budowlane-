@@ -7,11 +7,17 @@ from pathlib import Path
 
 OUT=Path("data/legislation.json")
 SEARCHES={
- "Prawo budowlane": ['site:gov.pl "prawo budowlane" nowelizacja','site:legislacja.rcl.gov.pl "prawo budowlane"','site:eli.gov.pl "prawo budowlane"'],
- "Prawo deweloperskie": ['site:gov.pl "ustawa deweloperska" zmiany','site:legislacja.rcl.gov.pl deweloperska','site:eli.gov.pl deweloper'],
- "Wspólnoty mieszkaniowe": ['site:gov.pl "własności lokali" nowelizacja','site:legislacja.rcl.gov.pl "własności lokali"','site:eli.gov.pl "własności lokali"'],
- "Umowy o roboty": ['site:gov.pl "zamówienia publiczne" nowelizacja roboty','site:legislacja.rcl.gov.pl "roboty budowlane"','site:eli.gov.pl "zamówień publicznych"'],
+ "Prawo budowlane": ['"prawo budowlane" nowelizacja','"warunki techniczne" budynki rozporządzenie','"pozwolenie na budowę" zmiana przepisów'],
+ "Nieruchomości": ['"gospodarka nieruchomościami" nowelizacja','"własność lokali" zmiana ustawy','"planowanie przestrzenne" nowe przepisy','"księgi wieczyste" nowelizacja'],
+ "Prawo deweloperskie": ['"ustawa deweloperska" zmiany','"deweloperski fundusz gwarancyjny" przepisy','"ochrona praw nabywcy" deweloper ustawa'],
 }
+TOPIC={
+ "Prawo budowlane": ("budowlan","budow","warunki techniczne","pozwolenie na budowę","nadzór budowlany"),
+ "Nieruchomości": ("nieruchomo","własnoś","wlasnos","lokal","planowani","zagospodarowani","księgi wieczyst","ksiegi wieczyst","grunt"),
+ "Prawo deweloperskie": ("deweloper","nabywc","mieszkaniowy rachunek powierniczy"),
+}
+LEGAL=("ustaw","rozporządzen","rozporzadzen","projekt","nowelizac","zmian","przepis","wejści","wejsc","uchwal","legislac")
+
 def get(url):
  req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 (public legal research index)"})
  with urllib.request.urlopen(req,timeout=15) as r:return r.read(1200000)
@@ -21,7 +27,7 @@ def main():
  existing={}
  try:
   data=json.loads(OUT.read_text(encoding="utf-8"))
-  existing={x["id"]:x for x in data.get("items",[]) if cutoff<=x.get("published","")<=today.isoformat()}
+  existing={x["id"]:x for x in data.get("items",[]) if x.get("area") in SEARCHES and cutoff<=x.get("published","")<=today.isoformat() and any(k in x.get("title","").lower() for k in TOPIC[x["area"]])}
  except (OSError,ValueError,KeyError,TypeError):pass
  ok=0
  for area,queries in SEARCHES.items():
@@ -36,7 +42,7 @@ def main():
      try:published=parsedate_to_datetime(item.findtext("pubDate") or "").date().isoformat()
      except (ValueError,TypeError):continue
      if not cutoff<=published<=today.isoformat():continue
-     if not any(k in title.lower() for k in ("ustaw","rozporządzen","rozporzadzen","projekt","nowelizac","zmian","przepis","prawo budowlan","deweloper","własności lokali","zamówień publicznych")):continue
+     if not any(k in title.lower() for k in LEGAL) or not any(k in title.lower() for k in TOPIC[area]):continue
      ident=hashlib.sha256((area+"|"+link).encode()).hexdigest()[:24]
      existing[ident]={"id":ident,"title":title[:300],"area":area,"published":published,
       "discovery_url":link,"stage":"Nieustalony — wymaga sprawdzenia dokumentu",
