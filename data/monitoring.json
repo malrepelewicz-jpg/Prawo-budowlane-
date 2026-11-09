@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-09T06:54:39.684476+00:00",
+  "updated_at": "2026-11-09T06:54:58.470849+00:00",
   "notice": "Automatyczny indeks wiadomości. Nie jest analizą prawną ani zweryfikowanym wykazem zmian.",
   "items": [
     {
@@ -684,6 +684,20 @@
       "priority": "Nieoceniona",
       "status": "Do weryfikacji",
       "source": "https://news.google.com/rss/articles/CBMiuAFBVV95cUxNZXFKeUVobEJ4LTMzU1EwS2N2ZE1XakJuLUYxSy1qQnVWblBrSnNkc1poeHJxQlZtdGc0NWZGMl8yYlR6bVA0MkREQXNtTnVpeWFNbzlzYmdid0tmaVA1V0VCUTREazU3Y3ViaGVwOV9qWlZJaG5BRkloQTVFeEwzeFA4VkYxaU8xb0FzU1N5cVh6c21XWUZDcVg2b3hKZTlZSWV6b3BEYnM3TVR2cW5pVmtqazNraTRW?oc=5",
+      "impact": "",
+      "action": "Otwórz źródło pierwotne i zweryfikuj treść, datę oraz znaczenie prawne.",
+      "discovery": "Google News RSS (indeks źródeł; link może prowadzić przez agregator)"
+    },
+    {
+      "id": "1b9857ea2e374f545a65d44d",
+      "title": "Nowy cykl - Ciekawe interpretacje Urzędu - Główny Urząd Nadzoru Budowlanego - Gov.pl",
+      "area": "Prawo budowlane",
+      "type": "Wiadomość do weryfikacji",
+      "date": "2022-02-03",
+      "effective": "",
+      "priority": "Nieoceniona",
+      "status": "Do weryfikacji",
+      "source": "https://news.google.com/rss/articles/CBMidkFVX3lxTE5rcnNsTG9MZVVnTnlxclJVT21aYzNaYi0wVk1BbTd4M3FvcjJTcHBlUjNpVk9VRUhBUW5INW94bzM0NFI5MGhoZG40emRTUDJfU1Yyb1g5Ni1HcGdzVXlicTg3T2dENlc1WU85VVBsMFRBc1c5S2c?oc=5",
       "impact": "",
       "action": "Otwórz źródło pierwotne i zweryfikuj treść, datę oraz znaczenie prawne.",
       "discovery": "Google News RSS (indeks źródeł; link może prowadzić przez agregator)"
